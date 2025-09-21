@@ -18,10 +18,10 @@ const categoriesMap = {
 };
 
 const platformIconsMap = {
-  Youtube: "https://vj-wiki.top/images/f/f5/Bilibili_Icon.svg",
-  Bilibili: "https://vj-wiki.top/images/f/f5/Bilibili_Icon.svg",
-  SoundCloud: "https://vj-wiki.top/images/f/f5/Bilibili_Icon.svg",
-  NicoNicoDouga: "https://vj-wiki.top/images/f/f5/Bilibili_Icon.svg",
+  Youtube: "https://voca.wiki/images/6/60/YouTube_Icon_Red.svg",
+  Bilibili: "https://voca.wiki/images/f/f5/Bilibili_Icon.svg",
+  SoundCloud: "https://voca.wiki/images/7/7d/SoundCloud_Icon.svg",
+  NicoNicoDouga: "https://voca.wiki/images/e/e0/Niconico_Logo_%282020%29.svg",
 };
 
 // =========== 小工具函数 =========
@@ -54,6 +54,13 @@ async function fetchArtistSongsData(artistId, page = 1, pageSize = 10) {
     `https://vocadb.net/api/songs?start=${
       pageSize * (page - 1)
     }&getTotalCount=true&maxResults=${pageSize}&query=&fields=Artists,MainPicture,PVs&lang=Default&nameMatchMode=Auto&sort=PublishDate&childTags=false&artistId%5B%5D=${artistId}&artistParticipationStatus=Everything&songTypes=Original,Remaster,Remix,Cover&onlyWithPvs=true`
+  );
+  return await response.json();
+}
+
+async function fetchSongData(songId) {
+  const response = await fetch(
+    `https://vocadb.net/api/songs/${songId}?fields=Artists,MainPicture,PVs&lang=Default`
   );
   return await response.json();
 }
@@ -131,11 +138,38 @@ function modifySongsData(songsData) {
       pv.icon = platformIconsMap[pv.service] || "";
     });
     // 选出一个最合适的缩略图
+    
     song.bestThumbnailUrl = song.pvs.filter(
-      (pv) => pv.service === "NicoNicoDouga"
+      (pv) => ["NicoNicoDouga", "Bilibili"].includes(pv.service)
     )[0]?.thumbUrl;
   });
   return songsData;
+}
+
+/**
+ * 去掉不符合标准的条目，并添加一些额外信息
+ * @param {Array} songsData
+ */
+function modifySongData(song) {
+
+  song.artistsArray = makeStaff(song.artists);
+  for (const [index, artist] of song.artistsArray.entries()) {
+    if (artist.role === "演唱") {
+      song.vocalists = artist.names;
+      song.artistsArray.splice(index, 1);
+    }
+  }
+
+  song.pvs.forEach((pv) => {
+    pv.icon = platformIconsMap[pv.service] || "";
+  });
+  // 选出一个最合适的缩略图
+  
+  song.bestThumbnailUrl = song.pvs.filter(
+    (pv) => ["NicoNicoDouga", "Bilibili"].includes(pv.service)
+  )[0]?.thumbUrl;
+
+  return song;
 }
 
 /**
@@ -164,21 +198,22 @@ function loadProducerWorks(id) {
           }));
         }
 
-        this.name = await fetchArtistData(id).then((data) => data.name);
+        const artistId = await (await fetch("https://api.voca.wiki/entry/producer/id?entry=海茶")).text()
+
+        response = await fetch("https://api.voca.wiki/entry/producer/song?id=" + artistId)
+        const data = await response.json()
+
 
         let songsData = [];
-        let total = 1000;
-        let page = 1;
-        const pageSize = 10;
+        let total = data.length;
 
-        while (pageSize * (page - 1) < total) {
-          const data = await fetchArtistSongsData(id, page);
-          total = data.totalCount;
-          const newItems = modifySongsData(data.items);
-          songsData.push(...newItems);
-          page++;
-          render(this, songsData);
+        // 一个一个获取数据，然后全部渲染
+        for (let i = 0; i < total; i++) {
+          const songData = await fetchSongData(data[i].song_id);
+          const newItems = modifySongData(songData);
+          songsData.push(newItems);
         }
+        render(this, songsData);
       },
     }));
   });
