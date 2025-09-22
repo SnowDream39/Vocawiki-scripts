@@ -40,6 +40,24 @@ function addToGroup(obj, key, value) {
   obj[key].push(value);
 }
 
+async function runWithConcurrency(tasks, limit) {
+  const results = [];
+  let index = 0;
+
+  async function worker() {
+    while (index < tasks.length) {
+      const i = index++;
+      results[i] = await tasks[i]();
+    }
+  }
+
+  // 启动 limit 个 worker
+  const workers = Array.from({ length: limit }, () => worker());
+  await Promise.all(workers);
+
+  return results;
+}
+
 // =========== API 调用 ===========
 
 async function fetchArtistData(artistId) {
@@ -179,7 +197,6 @@ function modifySongData(song) {
 function loadProducerWorks(id) {
   document.addEventListener("alpine:init", () => {
     Alpine.data("artistData", () => ({
-      name: "",
       songs: [],
 
       async init() {
@@ -203,16 +220,10 @@ function loadProducerWorks(id) {
         response = await fetch("https://api.voca.wiki/entry/producer/song?id=" + artistId)
         const data = await response.json()
 
+        const tasks = data.map(item => () => fetchSongData(item.song_id));
+        const results = await runWithConcurrency(tasks, 10);
+        let songsData = results.map(songData => modifySongData(songData));
 
-        let songsData = [];
-        let total = data.length;
-
-        // 一个一个获取数据，然后全部渲染
-        for (let i = 0; i < total; i++) {
-          const songData = await fetchSongData(data[i].song_id);
-          const newItems = modifySongData(songData);
-          songsData.push(newItems);
-        }
         render(this, songsData);
       },
     }));
