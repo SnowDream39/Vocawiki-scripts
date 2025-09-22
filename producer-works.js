@@ -222,7 +222,7 @@ function loadProducerWorks(entry) {
 
         const tasks = data.map(item => () => fetchSongData(item.song_id));
         const results = await runWithConcurrency(tasks, 10);
-        let songsData = results.map(songData => modifySongData(songData));
+        let songsData = results.map(songData => modifySongData(songData)).sort((a, b) => new Date(a.publishDate) - new Date(b.publishDate));
 
         render(this, songsData);
       },
