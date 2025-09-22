@@ -194,7 +194,7 @@ function modifySongData(song) {
  * 
  * @param {number} id 
  */
-function loadProducerWorks(id) {
+function loadProducerWorks(entry) {
   document.addEventListener("alpine:init", () => {
     Alpine.data("artistData", () => ({
       songs: [],
@@ -215,7 +215,7 @@ function loadProducerWorks(id) {
           }));
         }
 
-        const artistId = await (await fetch("https://api.voca.wiki/entry/producer/id?entry=海茶")).text()
+        const artistId = await (await fetch("https://api.voca.wiki/entry/producer/id?entry=" + entry)).text()
 
         response = await fetch("https://api.voca.wiki/entry/producer/song?id=" + artistId)
         const data = await response.json()
